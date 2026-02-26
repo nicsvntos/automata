@@ -1,0 +1,22 @@
+[project]
+name = "automata-search"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "Nic",email = "santos.nicole1010@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "streamlit (>=1.54.0,<2.0.0)",
+    "matplotlib (>=3.10.8,<4.0.0)",
+    "graphviz (>=0.21,<0.22)"
+]
+
+[tool.poetry]
+packages = [{include = "automata_search", from = "src"}]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
