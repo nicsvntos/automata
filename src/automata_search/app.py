@@ -16,121 +16,142 @@ st.title ("KMP Algorithm and DFA Visualizer")
 st.sidebar.header("Configuration")
 
 #pattern input
-pattern = st.sidebar.text_input("Enter Search Pattern", value="ABAB")
+pattern = st.sidebar.text_input("Input Search Pattern", value="ABAB")
 
 st.divider()
 
-#visualization section
-st.header("Finite Automata(DFA)")
+#text input
+st.sidebar.subheader("Visualization Mode")
+st.sidebar.write("Input Text Pattern to see the path traced:")
+demo_text = st.sidebar.text_area("Small Text Input", height=100, placeholder="e.g. ABABAC")
+
+st.sidebar.divider()
+
+#file input for big-o
+st.sidebar.subheader("Performance Mode")
+st.sidebar.write("Upload a file for speed analysis")
+uploaded_file = st.sidebar.file_uploader("File (1MB-10MB)", type=['txt'])
+
+#button
+run_btn = st.sidebar.button("Run Analysis", type="primary", use_container_width=True)
+
+#main app logic
 
 if pattern:
-    #generate a graph using the utils function
-    graph = utils.create_automata_diagram(pattern)
-    st.graphviz_chart(graph)
+    """
+    determines which mode to run:
+    If text is pasted, use visualization.
+    If file is uploaded, use performance
+    """
 
-    #display lps array
-    lps = dfa.compute_lps_array(pattern)
-    st.text(f"Computed LPS Array for '{pattern}': {lps}")
-else:
-    st.warning("Please enter a pattern in the sidebar to generate the Automata")
+    mode = "idle"
+    results = None
 
-st.divider()
-
-#file search section
-
-st.header("Single File Search")
-
-col1, col2 = st.columns(2)
-
-with col1:
-    st.subheader("Input File")
-    uploaded_file = st.file_uploader("Upload a .txt file(1MB - 10MB)", type=['txt'])
-
-    #button for the search filez
-    if st.button("Search Uploaded File",type="primary", use_container_width=True):
-        if uploaded_file and pattern:
-
+    if run_btn:
+        if demo_text:
+            mode = "visualization"
+            #kmp with path tracing
+            matches, path_history = dfa.kmp_search_with_path(demo_text, pattern)
+            results = {'matches': matches, 'path': path_history, 'data': demo_text}
+        
+        elif uploaded_file:
+            mode = "performance"
             #read file
             string_data = uploaded_file.read().decode("utf-8")
-            file_size_mb = len(string_data) / (1024 * 1024)
-
-            #perform search with timer
-            with st.spinner(f"Searching {file_size_mb:.2f} MB File..."):
-                start_time = time.time()
-                matches = dfa.kmp_search(string_data, pattern)
-                end_time = time.time()
-            
+            #run kmp
+            start_time = time.time()
+            matches = dfa.kmp_search(string_data, pattern)
+            end_time = time.time()
             time_taken = end_time - start_time
-
-            #display results
-            st.success ("Search complete!")
-            st.metric("Matches Found", matches)
-            st.metric("Time taken (seconds)", f"{time_taken:.4f}")
+            results = {'matches': matches, 'time': time_taken, 'size_mb': len(string_data)/(1024*1024)}
 
         else:
-            st.error ("Please upload a file and enter a pattern")
+            st.sidebar.warning("Please enter text or upload a file")
 
-with col2:
-    st.subheader("Algorithm info")
-    st.info("KMP Algorithm")
-st.divider()
+    #display automata graph
+    st.header("Finite Automate(DFA)")
+    """
+    if there are visual graphs, pass path_history. Otherwise pass None.
+    """
 
-#big-o analysis section
-st.header("Big-O Performance Analysis")
-st.markdown("click below to automatically generate files of increasing size and chart the performance")
+    history_to_draw = results ['path'] if (mode == "visualization" and results) else None
 
-if st.button("Run Big-O Simulation", use_container_width=True):
-    if not pattern:
-        st.error ("Please enter a pattern in the sidebar first")
-    else:
-        #define sizes to test (in MB)
-        sizes_mb = [1,2,5,10]
-        time_results = []
+    graph = utils.create_automata_diagram(pattern, path_history=history_to_draw)
+    st.graphviz_chart(graph)
 
-        #create a placeholder for the progress bar
-        bar_placeholder = st.empty()
-        progress_bar = bar_placeholder.progress(0)
+    st.divider()
 
-        st.write("Generating files and running search...")
+    #diplay results area
+    
+    #case 1: visualization results
+    if mode == 'visualization' and results:
+        st.header("Visual Trace")
+        col1, col2, = st.columns([1,1])
 
-        for i, size in enumerate(sizes_mb):
-
-            #generate temporary file
-            temp_filename = f"temp_test{size}mb.txt"
-            utils.generate_test_file(temp_filename, size)
-
-            #read file
-            with open (temp_filename, 'r', encoding='utf-8') as f:
-                data = f.read()
-            
-            #run search
-
-            start = time.time()
-            dfa.kmp_search(data, pattern)
-            end = time.time()
-
-            elapsed = end - start
-            time_results.append(elapsed)
-
-            #delete temp file
-            os.remove(temp_filename)
-
-            #update progress file
-            progress_bar.progress((i + 1) / len (sizes_mb))
+        with col1:
+            st.metric("Matches Found", results['matches'])
+            st.info(f"Pattern: '{pattern}' \nText: '{results['data']}'")
         
-        #clear progress bar
-        bar_placeholder.empty()
+        with col2:
+            st.subheader("Execution Log")
+            #shows the last few steps
+            for step in results['path'][-8:]:
+                icon = "✅" if step['type'] == 'match' else "🔄"
+                if step['type'] == 'reset': icon = "🏁"
+                st.text(f"{icon} State {step['from']} -> {step['to']} (Char: {step['char']})")
 
-        #display chart
-        st.subheader("Results")
-        st.line_chart(data=time_results, use_container_width=True)
+    #case 2: performance results
+    elif mode == "performance" and results:
+        st.header("Performance Metrics")
 
-        st.write("Analysis")
-        st.write(f"Pattern: '{pattern}'")
-        st.write("X-axis: File Size (1MB, 2MB, 5MB, 10MB)")
-        st.write("Y-Axis: Time (seconds)")
+        col1, col2, col3, = st.columns(3)
+        col1.metric("File Size", f"{results['size_mb']:.2f} MB")
+        col2.metric("Matches Found", results ['matches'])
+        col3.metric("Time Taken", f"{results['time']:.4f} sec")
 
-        if len (time_results) > 1:
-            ratio = time_results[-1] / time_results[0]
-            size_ratio = sizes_mb[-1] / sizes_mb[0]
-            st.success(f"Performance Check: Increasing file size by {size_ratio} * increased time by {ratio:.2f}. This indicates O(n) complexity")
+    #case 3: big-o simulation
+
+    st.divider()
+    st.header("Big-O Simulation")
+    st.markdown("Generate files of increasing size to test linear complexity")
+
+    if st.button("Run Big-O Simulation", use_container_width=True):
+        if not pattern:
+            st.error("Please enter pattern in the sidebar first.")
+        else:
+            sizes_mb = [1,2,5,10]
+            time_results = []
+            bar_placeholder = st.empty()
+            progress_bar = bar_placeholder.progress(0)
+
+            st.write ("Generating temporary files and running search...")
+
+            for i, size in enumerate(sizes_mb):
+                temp_filename = f"temp_test_{size}mb.txt"
+                utils.generate_test_file(temp_filename, size)
+
+                with open (temp_filename, 'r', encoding='utf-8') as f:
+                    data = f.read()
+
+                start = time.time()
+                dfa.kmp_search(data, pattern)
+                end = time.time()
+
+                elapsed = end - start
+                time_results.append(elapsed)
+                os.remove(temp_filename)
+
+                progress_bar.progress((i + 1) / len(sizes_mb))
+
+            bar_placeholder.empty()
+
+            st.subheader("Performance Chart")
+            st.line_chart(data = time_results, use_container_width=True)
+
+            if len (time_results) > 1:
+                ratio = time_results[-1] / time_results[0]
+                size_ratio = sizes_mb[-1] / sizes_mb[0]
+                st.success(f"Analysis: Increasing size by {size_ratio}x increased time by {ratio:.2f}x. Indicates O(n) complexity.")
+    
+else:
+    st.info("Please input a pattern in the sidebar to start.")
