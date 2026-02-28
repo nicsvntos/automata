@@ -5,8 +5,7 @@ import random
 def create_automata_diagram(pattern, path_history=None):
     """
     creates a diagram object showing the dfa for the pattern
-    Args:
-        pattern (_type_): _description_
+
     """
 
     from dfa import compute_lps_array
@@ -72,10 +71,6 @@ def create_automata_diagram(pattern, path_history=None):
 def generate_test_file(filename, size_mb):
     """
     generates a test dummy file
-
-    Args:
-        filename (_type_): _description_
-        size_mb (_type_): _description_
     """
 
     target_size = size_mb * 1024 * 1024
