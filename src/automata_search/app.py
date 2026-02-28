@@ -27,7 +27,7 @@ demo_text = st.sidebar.text_area("Small Text Input", height=100, placeholder="e.
 
 st.sidebar.divider()
 
-#file input for big-o
+#file upload for big-o notation
 st.sidebar.subheader("Performance Mode")
 st.sidebar.write("Upload a file for speed analysis")
 uploaded_file = st.sidebar.file_uploader("File (1MB-10MB)", type=['txt'])
@@ -38,11 +38,6 @@ run_btn = st.sidebar.button("Run Analysis", type="primary", use_container_width=
 #main app logic
 
 if pattern:
-    """
-    determines which mode to run:
-    If text is pasted, use visualization.
-    If file is uploaded, use performance
-    """
 
     mode = "idle"
     results = None
@@ -69,15 +64,26 @@ if pattern:
             st.sidebar.warning("Please enter text or upload a file")
 
     #display automata graph
-    st.header("Finite Automate(DFA)")
-    """
-    if there are visual graphs, pass path_history. Otherwise pass None.
-    """
+    st.header("Finite Automate(DFA) & LPS Table")
+    lps = dfa.compute_lps_array (pattern)
 
-    history_to_draw = results ['path'] if (mode == "visualization" and results) else None
+    table_data = {
+        "Pattern Char": list(pattern),
+        "LPS Value": lps
+    }
+    col_graph, col_table = st.columns([3,1])
 
-    graph = utils.create_automata_diagram(pattern, path_history=history_to_draw)
-    st.graphviz_chart(graph)
+    with col_graph:
+        history_to_draw = results ['path'] if (mode == "visualization" and results) else None
+        graph = utils.create_automata_diagram(pattern, path_history=history_to_draw)
+        st.graphviz_chart(graph)
+    
+    with col_table:
+        st.subheader("LPS Array")
+        st.dataframe(table_data, use_container_width=True)
+
+        st.caption ("Longest Prefix Suffix")
+        st.caption ("Tells the algorithm how far back to jump on mismatch")
 
     st.divider()
 
@@ -110,7 +116,6 @@ if pattern:
         col3.metric("Time Taken", f"{results['time']:.4f} sec")
 
     #case 3: big-o simulation
-
     st.divider()
     st.header("Big-O Simulation")
     st.markdown("Generate files of increasing size to test linear complexity")
