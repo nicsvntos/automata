@@ -47,7 +47,13 @@ if pattern:
             mode = "visualization"
             #kmp with path tracing
             matches, path_history = dfa.kmp_search_with_path(demo_text, pattern)
-            results = {'matches': matches, 'path': path_history, 'data': demo_text}
+
+            st.session_state.demo_results = {
+                'matches': matches,
+                'path': path_history,
+                'data': demo_text,
+                'pattern': pattern
+            }
         
         elif uploaded_file:
             mode = "performance"
@@ -90,21 +96,70 @@ if pattern:
     #diplay results area
     
     #case 1: visualization results
-    if mode == 'visualization' and results:
-        st.header("Visual Trace")
-        col1, col2, = st.columns([1,1])
+    if 'demo_results' in st.session_state:
+        results = st.session_state.demo_results
+        full_path = results['path']
+        total_steps = len(full_path)
 
-        with col1:
-            st.metric("Matches Found", results['matches'])
-            st.info(f"Pattern: '{pattern}' \nText: '{results['data']}'")
+        st.header("Visual Trace")
+
+        if total_steps > 0:
+            col1, col2 = st.columns([3,1])
+
+            with col1:
+                #animation slider
+                #shows the total steps first
+                current_step = st.slider (
+                    "Step Through Animation",
+                    min_value = 0,
+                    max_value= total_steps,
+                    value= total_steps,
+                    format = "Current Step: %d"
+                )
+
+                st.caption(f"Total Steps: {total_steps}")
+                #create the graph using only the path up to the current slider value
+
+                current_path_slice = full_path[:current_step]
+
+                graph = utils.create_automata_diagram(
+                    results['pattern'],
+                    path_history=current_path_slice
+                )
+                st.graphviz_chart(graph)
         
-        with col2:
-            st.subheader("Execution Log")
-            #shows the last few steps
-            for step in results['path'][-8:]:
-                icon = "✅" if step['type'] == 'match' else "🔄"
-                if step['type'] == 'reset': icon = "🏁"
-                st.text(f"{icon} State {step['from']} -> {step['to']} (Char: {step['char']})")
+            with col2:
+                st.metric("Total Matches", results['matches'])
+
+                #show details of the *current* step based on the slider position
+
+                if current_step > 0:
+                    last_move = full_path[current_step - 1]
+
+                    st.subheader("Current Step:")
+
+                    icon = "✅" if last_move['type'] == 'match' else "🔄"
+                    if last_move['type'] == 'reset': icon = "🏁"
+
+                    st.markdown(f"**{icon} Transition**")
+                    st.text(f"From: State {last_move['from']}")
+                    st.text(f"To: State {last_move['to']}")
+                    st.text(f"Char: '{last_move['char']}")
+
+                    st.divider()
+
+                    #show history log
+                    st.text("History:")
+                
+                    #show the last 5 moves relative to the slider
+                    recent = full_path[max(0, current_step - 5) : current_step]
+                    for move in recent:
+                        st.caption(f" -> State {move['to']}")
+            
+                else:
+                    st.info("Drag slider to start")
+        else:
+            st.warning ("No steps to visualize. Please enter a valid text in the sidebar")        
 
     #case 2: performance results
     elif mode == "performance" and results:
